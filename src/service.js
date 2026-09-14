@@ -6,6 +6,8 @@ const userRouter = require('./routes/userRouter.js');
 const version = require('./version.json');
 const config = require('./config.js');
 
+console.log("Service");
+
 const app = express();
 app.use(express.json());
 app.use(setAuthUser);
