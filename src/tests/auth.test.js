@@ -43,3 +43,5 @@ test('get menu', async () => {
   expect(menuRes.status).toBe(200);
   expect(menuRes.body).toEqual(expect.arrayContaining([expect.objectContaining({ title: 'Crusty' })]));
 });
+
+//test
