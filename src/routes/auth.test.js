@@ -10,7 +10,7 @@ let testUserAuthToken;
 
 // const { Role, DB } = require('../database/database.js');
 
-
+// test
 
 // async function createAdminUser() {
 //   let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
