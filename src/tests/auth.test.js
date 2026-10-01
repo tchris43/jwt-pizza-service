@@ -65,6 +65,39 @@ test('login', async () => {
   expect(loginRes.body.user).toMatchObject(user);
 });
 
+test('update user', async () => {
+  const { admin, adminAuthToken } = await loginNewAdmin();
+  const updatedUser = {
+    name: randomName(),
+    email: `${randomName()}@admin.com`,
+    password: 'updatedpassword',
+  };
+
+  const updateUserRes = await request(app)
+    .put(`/api/user/${admin.id}`)
+    .set('Authorization', `Bearer ${adminAuthToken}`)
+    .send(updatedUser);
+
+  expect(updateUserRes.status).toBe(200);
+  // Add response and re-login assertions here as the update behavior is expanded.
+  expect(updateUserRes.body.user.email).toBe(updatedUser.email);
+
+  const updatedUser2 = {
+    name: randomName(),
+    email: `${randomName()}@jwt.com`,
+    password: 'normalPassword',
+  };
+
+  const updateUserRes2 = await request(app)
+    .put(`/api/user/${admin.id}`)
+    .set('Authorization', `Bearer ${testUserAuthToken}`)
+    .send(updatedUser2);
+
+  expect(updateUserRes2.status).toBe(403);
+
+
+});
+
 test('get menu', async () => {
   const menuRes = await request(app).get('/api/order/menu').set('Authorization', `Bearer ${testUserAuthToken}`);
   expect(menuRes.status).toBe(200);
