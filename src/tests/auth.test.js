@@ -17,6 +17,32 @@ function randomName() {
   return Math.random().toString(36).substring(2, 12);
 }
 
+const menuItems = [
+  {
+    title: 'Veggie',
+    description: 'A garden of delight',
+    image: 'pizza1.png',
+    price: 0.0038,
+  },
+  {
+    title: 'Crusty',
+    description: 'A dry mouthed favorite',
+    image: 'pizza4.png',
+    price: 0.0028,
+  },
+];
+
+async function seedMenu() {
+  const existingMenu = await DB.getMenu();
+  const existingTitles = new Set(existingMenu.map((item) => item.title));
+
+  for (const item of menuItems) {
+    if (!existingTitles.has(item.title)) {
+      await DB.addMenuItem(item);
+    }
+  }
+}
+
 async function createAdminUser() {
   let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
   user.name = randomName();
@@ -52,6 +78,7 @@ async function createFranchiseWithStore() {
 // ---------- tests ----------
 
 beforeAll(async () => {
+  await seedMenu();
   ({ user: testUser, token: testUserAuthToken } = await registerNewUser('pizza diner'));
 });
 
@@ -99,6 +126,7 @@ test('update user', async () => {
 });
 
 test('get menu', async () => {
+  
   const menuRes = await request(app).get('/api/order/menu').set('Authorization', `Bearer ${testUserAuthToken}`);
   expect(menuRes.status).toBe(200);
   expect(menuRes.body).toEqual(expect.arrayContaining([expect.objectContaining({ title: 'Crusty' })]));
