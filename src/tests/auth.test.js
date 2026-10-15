@@ -255,6 +255,15 @@ test('list users', async () => {
   );
 });
 
+test('delete user'){
+  //fix syntax
+  //login or register admin
+  //register new user
+  //assert they show in list using name filter
+  //delete the user
+  //assert the response is empty when searching for them
+}
+
 async function registerUser(service) {
   const testUser = {
     name: 'pizza diner',
