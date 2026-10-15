@@ -255,18 +255,35 @@ test('list users', async () => {
   );
 });
 
-test('delete user'){
-  //fix syntax
-  //login or register admin
-  //register new user
-  //assert they show in list using name filter
-  //delete the user
-  //assert the response is empty when searching for them
-}
+test('delete user', async () => {
+  const { adminAuthToken } = await loginNewAdmin();
+  const uniqueName = `delete-${randomName()}`;
+  const [user] = await registerUser(request(app), uniqueName);
 
-async function registerUser(service) {
+  const searchBeforeDelete = await request(app)
+    .get('/api/user')
+    .query({ name: uniqueName })
+    .set('Authorization', `Bearer ${adminAuthToken}`);
+  expect(searchBeforeDelete.body.users).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: user.id, name: uniqueName })])
+  );
+
+  const deleteRes = await request(app)
+    .delete(`/api/user/${user.id}`)
+    .set('Authorization', `Bearer ${adminAuthToken}`);
+  expect(deleteRes.status).toBe(200);
+
+  const searchAfterDelete = await request(app)
+    .get('/api/user')
+    .query({ name: uniqueName })
+    .set('Authorization', `Bearer ${adminAuthToken}`);
+  expect(searchAfterDelete.body.users).toHaveLength(0);
+  expect(searchAfterDelete.body.more).toBe(false);
+});
+
+async function registerUser(service, name = 'pizza diner') {
   const testUser = {
-    name: 'pizza diner',
+    name,
     email: `${randomName()}@test.com`,
     password: 'a',
   };

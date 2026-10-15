@@ -203,6 +203,26 @@ class DB {
     }
   }
 
+  async deleteUser(userId) {
+    const connection = await this.getConnection();
+    try {
+      await connection.beginTransaction();
+      try {
+        // Remove records that refer to this user before deleting the user row.
+        await this.query(connection, 'DELETE FROM auth WHERE userId=?', [userId]);
+        await this.query(connection, 'DELETE FROM userRole WHERE userId=?', [userId]);
+        const result = await this.query(connection, 'DELETE FROM user WHERE id=?', [userId]);
+        await connection.commit();
+        return result.affectedRows > 0;
+      } catch {
+        await connection.rollback();
+        throw new StatusCodeError('unable to delete user', 500);
+      }
+    } finally {
+      connection.end();
+    }
+  }
+
   async getFranchises(authUser, page = 0, limit = 10, nameFilter = '*') {
     const connection = await this.getConnection();
 

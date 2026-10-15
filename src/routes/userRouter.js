@@ -74,8 +74,9 @@ userRouter.put(
 userRouter.delete(
   '/:userId',
   authRouter.authenticateToken,
+  //check that they are an admin
   asyncHandler(async (req, res) => {
-    res.json({ message: 'not implemented' });
+    res.json({ message: 'not implemented' }); //probably just return success
   })
 );
 
