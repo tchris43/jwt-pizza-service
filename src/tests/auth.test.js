@@ -222,13 +222,23 @@ test('list users unauthorized', async () => {
 });
 
 test('list users', async () => {
-  const [user, userToken] = await registerUser(request(app));
+  // Create an admin to make the authorized request and a couple of users to find in the results.
+  const { adminAuthToken } = await loginNewAdmin();
+  const [user1] = await registerUser(request(app));
+  const [user2] = await registerUser(request(app));
+
   const listUsersRes = await request(app)
     .get('/api/user')
-    .set('Authorization', 'Bearer ' + userToken);
+    .set('Authorization', `Bearer ${adminAuthToken}`);
   expect(listUsersRes.status).toBe(200);
 
-  
+  // Confirm both newly registered users are in the returned list.
+  expect(listUsersRes.body.users).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ id: user1.id, name: user1.name, email: user1.email }),
+      expect.objectContaining({ id: user2.id, name: user2.name, email: user2.email }),
+    ])
+  );
 });
 
 async function registerUser(service) {
