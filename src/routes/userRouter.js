@@ -74,9 +74,13 @@ userRouter.put(
 userRouter.delete(
   '/:userId',
   authRouter.authenticateToken,
-  //check that they are an admin
   asyncHandler(async (req, res) => {
-    res.json({ message: 'not implemented' }); //probably just return success
+    if (!req.user.isRole(Role.Admin)) {
+      return res.status(403).json({ message: 'unauthorized' });
+    }
+
+    await DB.deleteUser(Number(req.params.userId));
+    res.json({ message: 'user deleted' });
   })
 );
 
