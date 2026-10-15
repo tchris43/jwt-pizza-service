@@ -239,6 +239,9 @@ test('list users', async () => {
       expect.objectContaining({ id: user2.id, name: user2.name, email: user2.email }),
     ])
   );
+
+  //request listUsers again, but ask for the pagination limit to be 1
+  //assert that only one user is returned and there is more
 });
 
 async function registerUser(service) {
