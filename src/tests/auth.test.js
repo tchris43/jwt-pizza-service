@@ -224,7 +224,7 @@ test('list users unauthorized', async () => {
 test('list users', async () => {
   // Create an admin to make the authorized request and a couple of users to find in the results.
   const { adminAuthToken } = await loginNewAdmin();
-  await registerUser(request(app));
+  const [user1] = await registerUser(request(app));
   await registerUser(request(app));
 
   const listUsersRes = await request(app)
@@ -244,6 +244,15 @@ test('list users', async () => {
   //assert that only one user is returned and there is more
   expect(paginatedListRes.body.users).toHaveLength(1);
   expect(paginatedListRes.body.more).toBe(true);
+
+  const searchRes = await request(app)
+    .get('/api/user')
+    .query({ name: user1.name })
+    .set('Authorization', `Bearer ${adminAuthToken}`);
+  expect(searchRes.status).toBe(200);
+  expect(searchRes.body.users).toEqual(
+    expect.arrayContaining([expect.objectContaining({ name: user1.name })])
+  );
 });
 
 async function registerUser(service) {

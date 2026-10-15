@@ -257,6 +257,9 @@ class DB {
         user.roles = roles.map(({ role }) => ({ role }));
       }
 
+      //getUsers should take in an optional name parameter for filtering
+      //here it should filter users by name if name exists, and return that
+
       return [users, more];
     } finally {
       connection.end();
