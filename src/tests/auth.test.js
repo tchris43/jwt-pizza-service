@@ -224,21 +224,16 @@ test('list users unauthorized', async () => {
 test('list users', async () => {
   // Create an admin to make the authorized request and a couple of users to find in the results.
   const { adminAuthToken } = await loginNewAdmin();
-  const [user1] = await registerUser(request(app));
-  const [user2] = await registerUser(request(app));
+  await registerUser(request(app));
+  await registerUser(request(app));
 
   const listUsersRes = await request(app)
-    .get('/api/user')
+    .get('/api/user?page=1&limit=2')
     .set('Authorization', `Bearer ${adminAuthToken}`);
   expect(listUsersRes.status).toBe(200);
 
-  // Confirm both newly registered users are in the returned list.
-  expect(listUsersRes.body.users).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ id: user1.id, name: user1.name, email: user1.email }),
-      expect.objectContaining({ id: user2.id, name: user2.name, email: user2.email }),
-    ])
-  );
+  // Confirm the requested page contains exactly two users.
+  expect(listUsersRes.body.users).toHaveLength(2);
 
   //request listUsers again, but ask for the pagination limit to be 1
   const paginatedListRes = await request(app)

@@ -230,20 +230,34 @@ class DB {
     }
   }
 
-  async getUsers() {
-    const connection = await this.getConnection();
-    //get the limit
-    try {
-      const users = await this.query(connection, 'SELECT id, name, email FROM user ORDER BY name');
+  async getUsers(page = 1, requestedLimit = config.db.listPerPage) {
+    page = Number.parseInt(page, 10);
+    requestedLimit = Number.parseInt(requestedLimit, 10);
+    if (!Number.isInteger(page) || page < 1) page = 1;
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1) requestedLimit = config.db.listPerPage;
 
-      //if more users than limit, cap users at the limit. The rest is more
+    // Get the requested page of users, plus one to detect whether there are more.
+    const offset = (page - 1) * requestedLimit;
+    const connection = await this.getConnection();
+    try {
+      let users = await this.query(
+        connection,
+        'SELECT id, name, email FROM user ORDER BY name LIMIT ? OFFSET ?',
+        [requestedLimit + 1, offset]
+      );
+
+      // If the extra user exists, this page has a following page.
+      const more = users.length > requestedLimit;
+      if (more) {
+        users = users.slice(0, requestedLimit);
+      }
 
       for (const user of users) {
         const roles = await this.query(connection, 'SELECT role FROM userRole WHERE userId=?', [user.id]);
         user.roles = roles.map(({ role }) => ({ role }));
       }
 
-      return users; //return the more as well
+      return [users, more];
     } finally {
       connection.end();
     }

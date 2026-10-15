@@ -88,8 +88,8 @@ userRouter.get(
       return res.status(403).json({ message: 'unauthorized' });
     }
 
-    const users = await DB.getUsers();
-    res.json({ users, more: false });
+    const [users, more] = await DB.getUsers(req.query.page, req.query.limit);
+    res.json({ users, more });
   })
 );
 
