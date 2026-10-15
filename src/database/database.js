@@ -232,15 +232,18 @@ class DB {
 
   async getUsers() {
     const connection = await this.getConnection();
+    //get the limit
     try {
       const users = await this.query(connection, 'SELECT id, name, email FROM user ORDER BY name');
+
+      //if more users than limit, cap users at the limit. The rest is more
 
       for (const user of users) {
         const roles = await this.query(connection, 'SELECT role FROM userRole WHERE userId=?', [user.id]);
         user.roles = roles.map(({ role }) => ({ role }));
       }
 
-      return users;
+      return users; //return the more as well
     } finally {
       connection.end();
     }

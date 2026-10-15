@@ -241,7 +241,14 @@ test('list users', async () => {
   );
 
   //request listUsers again, but ask for the pagination limit to be 1
+  const paginatedListRes = await request(app)
+    .get('/api/user?page=1&limit=1')
+    .set('Authorization', `Bearer ${adminAuthToken}`);
+  expect(paginatedListRes.status).toBe(200);
+
   //assert that only one user is returned and there is more
+  expect(paginatedListRes.body.users).toHaveLength(1);
+  expect(paginatedListRes.body.more).toBe(true);
 });
 
 async function registerUser(service) {
