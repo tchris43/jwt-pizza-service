@@ -230,11 +230,12 @@ class DB {
     }
   }
 
-  async getUsers(page = 1, requestedLimit = config.db.listPerPage) {
+  async getUsers(page = 1, requestedLimit = config.db.listPerPage, nameFilter = '*') {
     page = Number.parseInt(page, 10);
     requestedLimit = Number.parseInt(requestedLimit, 10);
     if (!Number.isInteger(page) || page < 1) page = 1;
     if (!Number.isInteger(requestedLimit) || requestedLimit < 1) requestedLimit = config.db.listPerPage;
+    nameFilter = String(nameFilter || '*').replace(/\*/g, '%');
 
     // Get the requested page of users, plus one to detect whether there are more.
     const offset = (page - 1) * requestedLimit;
@@ -242,8 +243,8 @@ class DB {
     try {
       let users = await this.query(
         connection,
-        'SELECT id, name, email FROM user ORDER BY name LIMIT ? OFFSET ?',
-        [requestedLimit + 1, offset]
+        'SELECT id, name, email FROM user WHERE name LIKE ? ORDER BY name LIMIT ? OFFSET ?',
+        [nameFilter, requestedLimit + 1, offset]
       );
 
       // If the extra user exists, this page has a following page.
@@ -256,9 +257,6 @@ class DB {
         const roles = await this.query(connection, 'SELECT role FROM userRole WHERE userId=?', [user.id]);
         user.roles = roles.map(({ role }) => ({ role }));
       }
-
-      //getUsers should take in an optional name parameter for filtering
-      //here it should filter users by name if name exists, and return that
 
       return [users, more];
     } finally {
