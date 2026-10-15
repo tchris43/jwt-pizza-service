@@ -230,6 +230,22 @@ class DB {
     }
   }
 
+  async getUsers() {
+    const connection = await this.getConnection();
+    try {
+      const users = await this.query(connection, 'SELECT id, name, email FROM user ORDER BY name');
+
+      for (const user of users) {
+        const roles = await this.query(connection, 'SELECT role FROM userRole WHERE userId=?', [user.id]);
+        user.roles = roles.map(({ role }) => ({ role }));
+      }
+
+      return users;
+    } finally {
+      connection.end();
+    }
+  }
+
   async getUserFranchises(userId) {
     const connection = await this.getConnection();
     try {
