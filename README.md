@@ -6,6 +6,9 @@ Backend service for making JWT pizzas. This service tracks users and franchises 
 
 JWTs are used for authentication objects.
 
+ #### fixes
+ had to update IAM policy
+
 ## Deployment
 
 In order for the server to work correctly it must be configured by providing a `config.js` file.
