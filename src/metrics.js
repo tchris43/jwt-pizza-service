@@ -1,17 +1,19 @@
+const requestMetrics = {
+  total: 0,
+  byMethod: { GET: 0, PUT: 0, POST: 0, DELETE: 0 },
+};
+
 function requestTracker(req, res, next) {
-    const startedAt = Date.now();
     
     res.once('finish', () => {
-        const durationMs = Date.now() - startedAt;
+        requestMetrics.total += 1;
 
-        console.log({
-            method: req.method,
-            statusCode: res.statusCode,
-            durationMs,
-        });
+        if (Object.hasOwn(requestMetrics.byMethod, req.method)) {
+            requestMetrics.byMethod[req.method] += 1;
+        }
     });
 
     next();
 }
 
-module.exports = { requestTracker };
+module.exports = { requestTracker, requestMetrics };
