@@ -29,11 +29,19 @@ class OtelMetricBuilder {
       }],
     };
 
+    // Grafana Cloud OTLP expects HTTP Basic auth with "instance ID:token".
+    // Base64 encodes the credential pair for the Authorization header; it is
+    // not encryption, so the API token still belongs in GitHub Secrets.
+    const credentials = Buffer.from(
+      `${this.metricsConfig.accountId}:${this.metricsConfig.apiKey}`,
+      'utf8'
+    ).toString('base64');
+
     const response = await fetch(this.metricsConfig.endpointUrl, {
       method: 'POST',
       body: JSON.stringify(payload),
       headers: {
-        Authorization: `Bearer ${this.metricsConfig.accountId}:${this.metricsConfig.apiKey}`,
+        Authorization: `Basic ${credentials}`,
         'Content-Type': 'application/json',
       },
     });
