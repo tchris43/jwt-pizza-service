@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config.js');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
+const metrics = require('../metrics.js');
 
 const authRouter = express.Router();
 
@@ -74,8 +75,22 @@ authRouter.put(
   '/',
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    const user = await DB.getUser(email, password);
+
+    let user;
+    try {
+      user = await DB.getUser(email, password);
+    } catch (error) {
+      // getUser uses 404 for unknown users or incorrect passwords. Count those
+      // as failed login attempts, but don't mistake database outages for bad credentials.
+      if (error.statusCode === 404) {
+        metrics.recordAuthAttempt('failure');
+      }
+      throw error;
+    }
+
     const auth = await setAuth(user);
+    // Count success only after the credentials were checked and the session was stored.
+    metrics.recordAuthAttempt('success');
     res.json({ user: user, token: auth });
   })
 );

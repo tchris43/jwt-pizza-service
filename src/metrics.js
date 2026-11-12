@@ -4,6 +4,21 @@ const requestMetrics = {
   latencyByEndpoint: {},
 };
 
+// Cumulative login counters. The exporter can later send these to Grafana,
+// where the change in each counter can be displayed as attempts per minute.
+const authMetrics = {
+    successful: 0,
+    failed: 0,
+};
+
+function recordAuthAttempt(outcome) {
+    if (outcome === 'success') {
+        authMetrics.successful += 1;
+    } else if (outcome === 'failure') {
+        authMetrics.failed += 1;
+    }
+}
+
 // Keep the last activity time for each authenticated user in this process.
 // User IDs stay local; the metric we report later is only the count.
 const activeUsers = new Map();
@@ -54,4 +69,4 @@ function getActiveUserCount(now = Date.now()) {
     return activeUsers.size;
 }
 
-module.exports = { requestTracker, requestMetrics, getActiveUserCount };
+module.exports = { requestTracker, requestMetrics, authMetrics, recordAuthAttempt, getActiveUserCount };
