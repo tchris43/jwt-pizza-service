@@ -1,5 +1,6 @@
 const express = require('express');
 const config = require('../config.js');
+const metrics = require('../metrics.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
@@ -79,15 +80,38 @@ orderRouter.post(
   asyncHandler(async (req, res) => {
     const orderReq = req.body;
     const order = await DB.addDinerOrder(req.user, orderReq);
-    const r = await fetch(`${config.factory.url}/api/order`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
-      body: JSON.stringify({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }),
-    });
-    const j = await r.json();
+
+    // In this app, each entry in order.items represents one pizza.
+    const pizzaCount = order.items.length;
+    const orderPrice = order.items.reduce((total, item) => total + Number(item.price || 0), 0);
+
+    // Start timing only when we are about to call the Pizza Factory. This keeps
+    // database time out of the separate factory-creation latency measurement.
+    const factoryStartedAt = Date.now();
+    let r;
+    let j;
+    try {
+      r = await fetch(`${config.factory.url}/api/order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
+        body: JSON.stringify({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }),
+      });
+      // Include reading the response body in the time it took to get the result.
+      j = await r.json();
+    } catch (error) {
+      // Network errors and unreadable responses are failed factory attempts too.
+      metrics.pizzaPurchase(false, Date.now() - factoryStartedAt, 0, pizzaCount);
+      throw error;
+    }
+
+    const factoryLatencyMs = Date.now() - factoryStartedAt;
     if (r.ok) {
+      // Only a factory-accepted order counts as sold or earns revenue.
+      metrics.pizzaPurchase(true, factoryLatencyMs, orderPrice, pizzaCount);
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
+      // Count this failed order, but do not add its pizzas or price to sales.
+      metrics.pizzaPurchase(false, factoryLatencyMs, 0, pizzaCount);
       res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
     }
   })

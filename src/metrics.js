@@ -19,6 +19,39 @@ function recordAuthAttempt(outcome) {
     }
 }
 
+// Purchase metrics use explicit units: sold is individual pizzas, failures is
+// failed factory order attempts, and revenue is the value of successful orders.
+// Latency covers every factory attempt, whether it succeeds or fails.
+const pizzaMetrics = {
+    sold: 0,
+    creationFailures: 0,
+    revenue: 0,
+    factoryLatency: {
+        count: 0,
+        totalMs: 0,
+    },
+};
+
+function pizzaPurchase(success, latencyMs, price, pizzaCount) {
+    // Keep latency for both successful and failed factory attempts so failures
+    // that are slow still appear in the latency measurements.
+    const elapsedMs = Number(latencyMs);
+    pizzaMetrics.factoryLatency.count += 1;
+    pizzaMetrics.factoryLatency.totalMs += Number.isFinite(elapsedMs) ? elapsedMs : 0;
+
+    if (success) {
+        // Count each pizza in the order, and add revenue only after acceptance.
+        const count = Number(pizzaCount);
+        const orderPrice = Number(price);
+        pizzaMetrics.sold += Number.isFinite(count) ? count : 0;
+        pizzaMetrics.revenue += Number.isFinite(orderPrice) ? orderPrice : 0;
+    } else {
+        // One failed factory order is one creation failure, even if it contained
+        // multiple requested pizzas.
+        pizzaMetrics.creationFailures += 1;
+    }
+}
+
 const os = require('os');
 
 function getCpuUsagePercentage() {
@@ -84,4 +117,12 @@ function getActiveUserCount(now = Date.now()) {
     return activeUsers.size;
 }
 
-module.exports = { requestTracker, requestMetrics, authMetrics, recordAuthAttempt, getActiveUserCount };
+module.exports = {
+    requestTracker,
+    requestMetrics,
+    authMetrics,
+    recordAuthAttempt,
+    pizzaMetrics,
+    pizzaPurchase,
+    getActiveUserCount,
+};
