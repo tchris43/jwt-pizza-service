@@ -55,6 +55,12 @@ jobs:
               url: 'https://pizza-factory.cs329.click',
               apiKey: '${{ secrets.FACTORY_API_KEY }}',
             },
+            metrics: {
+              source: 'jwt-pizza-service',
+              endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL }}',
+              accountId: '${{ secrets.METRICS_ACCOUNT_ID }}',
+              apiKey: '${{ secrets.METRICS_API_KEY }}',
+            },
           };" > src/config.js
 
       - name: Tests
@@ -133,28 +139,3 @@ jobs:
         run: |
           aws ecs update-service --cluster jwt-pizza-service --service jwt-pizza-service-service-qvmtwdy8 --force-new-deployment
 
-      - name: Write config file
-        run: |
-          echo "module.exports = {
-            jwtSecret: '${{ secrets.JWT_SECRET }}',
-            db: {
-              connection: {
-                host: '127.0.0.1',
-                user: 'root',
-                password: 'tempdbpassword',
-                database: 'pizza',
-                connectTimeout: 60000,
-              },
-              listPerPage: 10,
-            },
-            factory: {
-              url: 'https://pizza-factory.cs329.click',
-              apiKey: '${{ secrets.FACTORY_API_KEY }}',
-            },
-            metrics: {
-              source: 'jwt-pizza-service',
-              endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL, }}',
-              apiKey: '${{ secrets.METRICS_API_KEY }}',
-              accountId: '${{ secrets.METRICS_ACCOUNT_ID_KEY }}',
-            },            
-          };" > src/config.js
