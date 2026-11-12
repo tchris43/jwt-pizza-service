@@ -21,6 +21,16 @@ done
 # Keep the host easy to pass with or without a trailing slash.
 host=${1%/}
 
+# The public hostname currently resolves to an HTML site, while this ALB serves
+# the API for that hostname. Keep HTTPS using the public hostname (and its
+# certificate) but connect to the ALB. Override CURL_CONNECT_TO if AWS changes
+# the load balancer DNS name, or set it to an empty value after DNS is corrected.
+CURL_CONNECT_TO=${CURL_CONNECT_TO-'pizza.nextevent.click:443:jwt-pizza-service-595137225.us-east-1.elb.amazonaws.com:443'}
+curl_connect_options=()
+if [[ -n "$CURL_CONNECT_TO" ]]; then
+  curl_connect_options=(--connect-to "$CURL_CONNECT_TO")
+fi
+
 # These stable email addresses are registered once, then reused on later runs.
 # Override them and their passwords if these addresses already belong to other users.
 DINER_EMAIL=${DINER_EMAIL:-pizza-traffic-diner@example.com}
@@ -36,7 +46,7 @@ MENU_ID=${MENU_ID:-1}
 # Arguments are passed directly to curl; eval is deliberately avoided.
 request_status() {
   curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
-    --connect-timeout 10 --max-time 30 "$@"
+    --connect-timeout 10 --max-time 30 "${curl_connect_options[@]}" "$@"
 }
 
 # Log in and print just the token. A missing/invalid token makes this function fail.
@@ -48,6 +58,7 @@ login() {
   payload=$(jq -cn --arg email "$email" --arg password "$password" \
     '{email: $email, password: $password}')
   response=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+    "${curl_connect_options[@]}" \
     -X PUT "$host/api/auth" \
     -H 'Content-Type: application/json' \
     --data "$payload") || return 1
@@ -67,7 +78,7 @@ ensure_user() {
   local name=$1
   local email=$2
   local password=$3
-  local token payload response status
+  local token payload registration_result response status message response_summary
 
   if token=$(login "$email" "$password"); then
     status=$(request_status "$host/api/user/me" \
@@ -81,12 +92,23 @@ ensure_user() {
 
   payload=$(jq -cn --arg name "$name" --arg email "$email" --arg password "$password" \
     '{name: $name, email: $email, password: $password}')
-  response=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+  registration_result=$(curl --silent --show-error --connect-timeout 10 --max-time 30 \
+    "${curl_connect_options[@]}" \
+    --write-out $'\n%{http_code}' \
     -X POST "$host/api/auth" \
     -H 'Content-Type: application/json' \
-    --data "$payload") || response=""
+    --data "$payload") || registration_result=""
+  status=${registration_result##*$'\n'}
+  response=${registration_result%$'\n'*}
+  [[ -n "$status" ]] || status="curl failed"
   token=$(printf '%s' "$response" | jq -er \
     '.token | select(type == "string" and length > 0)' 2>/dev/null) || token=""
+
+  # Some deployments may complete registration but return an empty response.
+  # Try the credentials once before treating that HTTP 200 as a failure.
+  if [[ -z "$token" && "$status" == "200" ]]; then
+    token=$(login "$email" "$password") || token=""
+  fi
 
   if [[ -n "$token" ]]; then
     status=$(request_status "$host/api/user/me" \
@@ -99,7 +121,20 @@ ensure_user() {
   fi
 
   echo "Could not log in or register $email." >&2
-  echo "If this email already exists, set its correct password or choose a different email." >&2
+  message=$(printf '%s' "$response" | jq -er '.message // empty' 2>/dev/null) || message=""
+  if [[ -n "$message" ]]; then
+    echo "Registration returned HTTP $status: $message" >&2
+  else
+    echo "Registration returned HTTP $status without a usable token or error message." >&2
+  fi
+  response_summary=$(printf '%s' "$response" | jq -er '
+    if type == "object" then
+      "JSON object; fields: \(keys | join(", ")); token: \(if (.token | type) == "string" and (.token | length) > 0 then "present" else "absent" end)"
+    else
+      "JSON value type: \(type)"
+    end' 2>/dev/null) || response_summary="empty or not JSON"
+  echo "Response summary: $response_summary" >&2
+  echo "If the email already exists, set its correct password or choose a different email." >&2
   return 1
 }
 
