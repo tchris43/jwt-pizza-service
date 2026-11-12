@@ -1,68 +1,38 @@
-const config = require('./grafanaConfig.js');
+const config = require('./config.js');
+const metrics = require('./metrics.js');
+const OtelMetricBuilder = require('./otelMetricBuilder.js');
 
-console.log("My URL is:", config.endpointUrl);
+function sendMetricsPeriodically(periodMs = 10_000) {
+  // This flag prevents a slow Grafana request from overlapping the next timer run.
+  let sending = false;
 
-let requests = 0;
-let latency = 0;
+  // setInterval repeats this callback after each period (10 seconds by default).
+  return setInterval(async () => {
+    // If the previous export is still running, skip this tick and try next time.
+    if (sending) return;
 
-setInterval(() => {
-  const cpuValue = Math.floor(Math.random() * 100) + 1;
-  sendMetricToGrafana('cpu', cpuValue, 'gauge', '%');
+    sending = true;
+    try {
+      // The builder knows how to format the data and send it to Grafana.
+      const builder = new OtelMetricBuilder(config.metrics);
 
-  requests += Math.floor(Math.random() * 200) + 1;
-  sendMetricToGrafana('requests', requests, 'sum', '1');
+      // Each helper reads its current values from metrics.js and groups related metrics.
+      builder.add(metrics.getHttpMetrics());
+      builder.add(metrics.getSystemMetrics());
+      builder.add(metrics.getUserMetrics());
+      builder.add(metrics.getPurchaseMetrics());
+      builder.add(metrics.getAuthMetrics());
 
-  latency += Math.floor(Math.random() * 200) + 1;
-  sendMetricToGrafana('latency', latency, 'sum', 'ms');
-}, 1000);
-
-function sendMetricToGrafana(metricName, metricValue, type, unit) {
-  const metric = {
-    resourceMetrics: [
-      {
-        scopeMetrics: [
-          {
-            metrics: [
-              {
-                name: metricName,
-                unit: unit,
-                [type]: {
-                  dataPoints: [
-                    {
-                      asInt: metricValue,
-                      timeUnixNano: Date.now() * 1000000,
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-
-  if (type === 'sum') {
-    metric.resourceMetrics[0].scopeMetrics[0].metrics[0][type].aggregationTemporality = 'AGGREGATION_TEMPORALITY_CUMULATIVE';
-    metric.resourceMetrics[0].scopeMetrics[0].metrics[0][type].isMonotonic = true;
-  }
-
-  const body = JSON.stringify(metric);
-  fetch(`${config.endpointUrl}`, {
-    method: 'POST',
-    body: body,
-    headers: { Authorization: `Bearer ${config.accountId}:${config.apiKey}`, 'Content-Type': 'application/json' },
-  })
-    .then((response) => {
-      if (!response.ok) {
-        response.text().then((text) => {
-          console.error(`Failed to push metrics data to Grafana: ${text}\n${body}`);
-        });
-      } else {
-        console.log(`Pushed ${metricName}`);
-      }
-    })
-    .catch((error) => {
-      console.error('Error pushing metrics:', error);
-    });
+      // Send all five groups together in one Grafana request.
+      await builder.sendToGrafana();
+    } catch (error) {
+      // Keep an export problem from interrupting the Express server.
+      console.error('Error sending metrics to Grafana:', error.message);
+    } finally {
+      // Allow the next timer run, whether this send succeeded or failed.
+      sending = false;
+    }
+  }, periodMs);
 }
+
+module.exports = { sendMetricsPeriodically };

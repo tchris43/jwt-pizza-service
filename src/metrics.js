@@ -1,3 +1,5 @@
+const os = require('os');
+
 const requestMetrics = {
   total: 0,
   byMethod: { GET: 0, PUT: 0, POST: 0, DELETE: 0 },
@@ -51,8 +53,6 @@ function pizzaPurchase(success, latencyMs, price, pizzaCount) {
         pizzaMetrics.creationFailures += 1;
     }
 }
-
-const os = require('os');
 
 function getCpuUsagePercentage() {
   const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -117,6 +117,101 @@ function getActiveUserCount(now = Date.now()) {
     return activeUsers.size;
 }
 
+// These helpers turn the values collected above into groups the exporter can send.
+function getHttpMetrics() {
+    const routeStats = Object.entries(requestMetrics.latencyByEndpoint);
+    const metrics = [
+        {
+            name: 'http_requests_total',
+            type: 'sum',
+            unit: '1',
+            points: [{ value: requestMetrics.total }],
+        },
+        {
+            name: 'http_requests_by_method_total',
+            type: 'sum',
+            unit: '1',
+            points: Object.entries(requestMetrics.byMethod).map(([method, value]) => ({
+                value,
+                attributes: { method },
+            })),
+        },
+    ];
+
+    if (routeStats.length > 0) {
+        metrics.push(
+            {
+                name: 'http_request_duration_ms_sum',
+                type: 'sum',
+                unit: 'ms',
+                points: routeStats.map(([route, stats]) => ({
+                    value: stats.totalMs,
+                    attributes: { route },
+                })),
+            },
+            {
+                name: 'http_request_duration_count',
+                type: 'sum',
+                unit: '1',
+                points: routeStats.map(([route, stats]) => ({
+                    value: stats.count,
+                    attributes: { route },
+                })),
+            }
+        );
+    }
+
+    return metrics;
+}
+
+function getUserMetrics() {
+    return [{
+        name: 'active_users',
+        type: 'gauge',
+        unit: '1',
+        points: [{ value: getActiveUserCount() }],
+    }];
+}
+
+function getAuthMetrics() {
+    return [{
+        name: 'auth_attempts_total',
+        type: 'sum',
+        unit: '1',
+        points: [
+            { value: authMetrics.successful, attributes: { outcome: 'success' } },
+            { value: authMetrics.failed, attributes: { outcome: 'failure' } },
+        ],
+    }];
+}
+
+function getSystemMetrics() {
+    return [
+        {
+            name: 'cpu_usage_percent',
+            type: 'gauge',
+            unit: '%',
+            points: [{ value: getCpuUsagePercentage(), valueType: 'asDouble' }],
+        },
+        {
+            name: 'memory_usage_percent',
+            type: 'gauge',
+            unit: '%',
+            points: [{ value: getMemoryUsagePercentage(), valueType: 'asDouble' }],
+        },
+    ];
+}
+
+function getPurchaseMetrics() {
+    return [
+        { name: 'pizzas_sold_total', type: 'sum', unit: '1', points: [{ value: pizzaMetrics.sold }] },
+        { name: 'pizza_creation_failures_total', type: 'sum', unit: '1', points: [{ value: pizzaMetrics.creationFailures }] },
+        { name: 'pizza_revenue_total', type: 'sum', unit: 'USD', points: [{ value: pizzaMetrics.revenue, valueType: 'asDouble' }] },
+        { name: 'pizza_factory_duration_ms_sum', type: 'sum', unit: 'ms', points: [{ value: pizzaMetrics.factoryLatency.totalMs }] },
+        { name: 'pizza_factory_duration_count', type: 'sum', unit: '1', points: [{ value: pizzaMetrics.factoryLatency.count }] },
+    ];
+}
+
 module.exports = {
     requestTracker,
     requestMetrics,
@@ -125,4 +220,11 @@ module.exports = {
     pizzaMetrics,
     pizzaPurchase,
     getActiveUserCount,
+    getCpuUsagePercentage,
+    getMemoryUsagePercentage,
+    getHttpMetrics,
+    getUserMetrics,
+    getAuthMetrics,
+    getSystemMetrics,
+    getPurchaseMetrics,
 };
