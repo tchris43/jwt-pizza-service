@@ -157,6 +157,4 @@ jobs:
           body: |
             ## 🚀 Changes
 
-          ${{ github.event.head_commit.message }}
-
-          **commit**: ${{ github.sha }}
+          ${{ github.event.head_commit.message }} **commit**: ${{ github.sha }}
