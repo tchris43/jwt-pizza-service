@@ -4,6 +4,7 @@ const metrics = require('../metrics.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
+const { sendLogToGrafana } = require('../logger.js');
 
 const orderRouter = express.Router();
 
@@ -88,18 +89,31 @@ orderRouter.post(
     // Start timing only when we are about to call the Pizza Factory. This keeps
     // database time out of the separate factory-creation latency measurement.
     const factoryStartedAt = Date.now();
+    const factoryRequestBody = { diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order };
     let r;
     let j;
     try {
       r = await fetch(`${config.factory.url}/api/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
-        body: JSON.stringify({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }),
+        body: JSON.stringify(factoryRequestBody),
       });
       // Include reading the response body in the time it took to get the result.
       j = await r.json();
+      void sendLogToGrafana({
+        userId: req.user.id,
+        requestBody: factoryRequestBody,
+        responseStatus: r.status,
+        responseBody: j,
+      }, 'factory');
     } catch (error) {
       // Network errors and unreadable responses are failed factory attempts too.
+      void sendLogToGrafana({
+        userId: req.user.id,
+        requestBody: factoryRequestBody,
+        responseStatus: r?.status ?? null,
+        responseBody: null,
+      }, 'factory');
       metrics.pizzaPurchase(false, Date.now() - factoryStartedAt, 0, pizzaCount);
       throw error;
     }

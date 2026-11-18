@@ -6,12 +6,14 @@ const userRouter = require('./routes/userRouter.js');
 const version = require('./version.json');
 const config = require('./config.js');
 const { requestTracker } = require('./metrics.js');
+const { httpLogger, getCurrentUserId, sendLogToGrafana } = require('./logger.js');
 
 console.log("Service");
 
 const app = express();
 app.use(express.json());
 app.use(setAuthUser);
+app.use(httpLogger);
 app.use(requestTracker);
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -51,7 +53,19 @@ app.use('*', (req, res) => {
 
 // Default error handler for all exceptions and errors.
 app.use((err, req, res, next) => {
-  res.status(err.statusCode ?? 500).json({ message: err.message, stack: err.stack });
+  const statusCode = err.statusCode ?? 500;
+  if (statusCode >= 500) {
+    void sendLogToGrafana({
+      method: req.method,
+      path: req.path,
+      statusCode,
+      userId: getCurrentUserId(),
+      errorType: err.name,
+      message: err.message,
+    }, 'exception');
+  }
+
+  res.status(statusCode).json({ message: err.message, stack: err.stack });
   next();
 });
 
