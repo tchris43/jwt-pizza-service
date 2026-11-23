@@ -150,7 +150,7 @@ jobs:
           curl -s -X POST https://graciousbarracuda884.grafana.net/api/annotations \
           -H "Authorization: Bearer ${{ secrets.GRAFANA_ACCESS_TOKEN }}" \
           -H "Content-Type: application/json" \
-          -d '{"dashboardUID":"tcrz9k4", "panelId":"panel-1", "tags":["backend","production"], "text":"Version '"$version"' deployed" }'
+          -d '{"dashboardUID":"tcrz9k4", "panelId":1, "tags":["backend","production"], "text":"Version '"$version"' deployed" }'
 
   release:
     needs:
